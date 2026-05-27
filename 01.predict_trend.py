@@ -54,6 +54,7 @@ MIN_FRAMES  = 150    # 분 구간 프레임이 이보다 적으면 통계 신뢰
 
 SAVE_MODEL = True
 MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'model.pkl')
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dataset')
 
 # ================================================================
 # 내부 함수
@@ -78,6 +79,16 @@ def _trend(series):
         return 0.0
     x = np.linspace(0.0, 1.0, len(y))
     return float(np.polyfit(x, y, 1)[0])
+
+
+def _resolve_data_path(path):
+    """상대경로면 현재 폴더, 없으면 dataset 폴더를 확인."""
+    if os.path.isabs(path):
+        return path
+    local = os.path.join(os.path.dirname(os.path.abspath(__file__)), path)
+    if os.path.exists(local):
+        return local
+    return os.path.join(DATA_DIR, path)
 
 
 def _load_clean(filepath):
@@ -148,12 +159,13 @@ print("=" * 55)
 
 all_feats = []
 for fn, labels in VIDEO_LABELS.items():
-    if os.path.exists(fn):
-        feat = load_and_extract(fn, labels)
+    full_path = _resolve_data_path(fn)
+    if os.path.exists(full_path):
+        feat = load_and_extract(full_path, labels)
         all_feats.append(feat)
         print(f"  로드: {fn} → {len(feat)}구간")
     else:
-        print(f"  ❌ {fn} 없음 (건너뜀)")
+        print(f"  ❌ {fn} 없음 (건너뜀) [{full_path}]")
 
 if not all_feats:
     sys.exit("학습할 영상이 하나도 없습니다. 파일 경로를 확인하세요.")
@@ -213,14 +225,15 @@ print(f"\n{'=' * 55}")
 print(f"[ STEP 2 ] 예측: {PREDICT_FILE}")
 print("=" * 55)
 
-if not os.path.exists(PREDICT_FILE):
-    sys.exit(f"예측 파일이 없습니다: {PREDICT_FILE}")
+predict_path = _resolve_data_path(PREDICT_FILE)
+if not os.path.exists(predict_path):
+    sys.exit(f"예측 파일이 없습니다: {PREDICT_FILE} [{predict_path}]")
 
 if PREDICT_LABELS:
-    feat_new = load_and_extract(PREDICT_FILE, PREDICT_LABELS)
+    feat_new = load_and_extract(predict_path, PREDICT_LABELS)
     has_label = True
 else:
-    feat_new = load_predict_only(PREDICT_FILE)
+    feat_new = load_predict_only(predict_path)
     has_label = False
 
 feat_new = feat_new.dropna(subset=FEATURE_COLS).reset_index(drop=True)
